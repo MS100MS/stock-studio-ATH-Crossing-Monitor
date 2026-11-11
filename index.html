@@ -1,0 +1,933 @@
+<title>ATH Crossing Monitor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap">
+<style>
+/* Layout: terminal family. Console with calendar and 20-slot tape on top, then a Day view and a 20-day Analysis view behind a switch. */
+:root{
+  --bg:#0A0C0F; --panel:#11151A; --panel2:#171C22; --line:#232A33; --line2:#2F3844;
+  --fg:#E7EAEE; --mut:#8D98A5; --dim:#5F6A77;
+  --accent:#FFA028; --accent-soft:rgba(255,160,40,.12); --accent-ink:#1A1000;
+  --good:#3FB950; --bad:#F85149;
+  --s1:#4A90E2; --s2:#BF822C; --s3:#22A586; --s4:#A070EC; --s5:#2D9FBC; --s6:#E85A9A; --s0:#8D98A5;
+  --r1:#FFB04A; --r2:#D68A25; --r4:#4A4036;
+  --on1:#1A1000; --on2:#1A1000; --on4:#E7EAEE;
+  --f-body:'IBM Plex Sans',system-ui,sans-serif;
+  --f-head:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#ECEFF3; --panel:#FFFFFF; --panel2:#F4F6F8; --line:#D8DEE5; --line2:#C3CBD4;
+  --fg:#12171D; --mut:#566270; --dim:#8893A0;
+  --accent:#B25A00; --accent-soft:rgba(178,90,0,.10); --accent-ink:#FFFFFF;
+  --good:#1A7F37; --bad:#CF222E;
+  --s1:#1F6FD1; --s2:#A66A00; --s3:#0B8F6A; --s4:#7A45D0; --s5:#0E7FA6; --s6:#C2307F; --s0:#566270;
+  --r1:#B25A00; --r2:#D98A2B; --r4:#D5D9DD;
+  --on1:#FFFFFF; --on2:#12171D; --on4:#12171D;
+  color-scheme:light;
+}}
+:root[data-theme="light"]{
+  --bg:#ECEFF3; --panel:#FFFFFF; --panel2:#F4F6F8; --line:#D8DEE5; --line2:#C3CBD4;
+  --fg:#12171D; --mut:#566270; --dim:#8893A0;
+  --accent:#B25A00; --accent-soft:rgba(178,90,0,.10); --accent-ink:#FFFFFF;
+  --good:#1A7F37; --bad:#CF222E;
+  --s1:#1F6FD1; --s2:#A66A00; --s3:#0B8F6A; --s4:#7A45D0; --s5:#0E7FA6; --s6:#C2307F; --s0:#566270;
+  --r1:#B25A00; --r2:#D98A2B; --r4:#D5D9DD;
+  --on1:#FFFFFF; --on2:#12171D; --on4:#12171D;
+  color-scheme:light;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 56px}
+.wrap{max-width:1440px;margin-inline:auto;display:grid;gap:14px}
+.wrap>*,.view>*{min-width:0}
+.view{display:grid;gap:14px;min-width:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.up{color:var(--good)} .dn{color:var(--bad)}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.mark{width:34px;height:30px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font:600 12px var(--f-mono);border-radius:3px}
+.brand h1{margin:0;font:600 19px/1.1 var(--f-head);letter-spacing:.12em;text-transform:uppercase}
+.brand p{margin:2px 0 0;color:var(--mut);font-size:12.5px}
+.top-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line2);background:var(--panel);border-radius:3px;padding:5px 10px;font:500 12px var(--f-mono);color:var(--mut)}
+.chip b{color:var(--fg);font-weight:500}
+.btn{border:1px solid var(--line2);background:var(--panel2);border-radius:3px;padding:6px 12px;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.pri:hover{filter:brightness(1.08)}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:3px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;padding:7px 15px;font:600 12px var(--f-mono);letter-spacing:.05em;color:var(--mut)}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+
+.tape{display:flex;gap:22px;overflow-x:auto;padding:8px 14px;border:1px solid var(--line);background:var(--panel);font:12px var(--f-mono);white-space:nowrap;border-radius:3px}
+.tape span b{font-weight:600;margin-right:6px}
+.tape .lbl{color:var(--accent);letter-spacing:.1em}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.panel h2{margin:0;font:600 12.5px var(--f-head);letter-spacing:.1em;text-transform:uppercase}
+.panel h2::before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);margin-right:8px}
+.sub{color:var(--mut);font-size:12.5px}
+
+/* console */
+.console{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:22px}
+.cal-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.cal-top b{font:600 13px var(--f-head);letter-spacing:.1em;text-transform:uppercase}
+.cal-top button{border:1px solid var(--line2);background:var(--panel2);border-radius:3px;width:30px;height:28px;line-height:1}
+.cal-top button:hover{border-color:var(--accent)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dow{font:500 10px var(--f-mono);color:var(--dim);text-align:center;letter-spacing:.08em;padding:2px 0}
+.day{min-height:46px;border:1px solid var(--line);background:var(--panel2);border-radius:3px;padding:4px 5px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;font:500 12px var(--f-mono);position:relative;min-width:0}
+.day .c{font-size:10px;color:var(--dim);white-space:nowrap}
+.day:hover{border-color:var(--mut)}
+.day.we{opacity:.6}
+.day.has{border-color:var(--accent);background:var(--accent-soft)}
+.day.has .c{color:var(--accent);font-weight:600}
+.day.hol .c{color:var(--mut)}
+.day.miss{border-style:dashed;border-color:var(--bad)}
+.day.miss .c{color:var(--bad)}
+.day.sel{outline:2px solid var(--fg);outline-offset:1px}
+.day.off{opacity:.28;cursor:not-allowed}
+.day.over{background:var(--accent-soft);border-color:var(--accent);border-style:solid}
+.day.today::after{content:"";position:absolute;right:4px;top:4px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.day.pad{visibility:hidden;border:0}
+.cal-key{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--mut)}
+.cal-key i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;border:1px solid var(--line2)}
+.cal-key i.h{border-color:var(--accent);background:var(--accent-soft)}
+.cal-key i.m{border:1px dashed var(--bad)}
+
+.rcol{display:grid;gap:14px;align-content:start;min-width:0}
+.selbox{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;border:1px solid var(--line2);border-radius:4px;padding:12px 14px;background:var(--panel2)}
+.selbox .lb2{font:500 10.5px var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+.selbox .seld{font:600 18px var(--f-head);letter-spacing:.03em;margin-top:2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.drop{border:1.5px dashed var(--line2);border-radius:4px;padding:16px 18px;display:grid;gap:4px;justify-items:start;background:var(--panel2);transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{font:600 15px var(--f-head);letter-spacing:.03em}
+.drop p{margin:0;color:var(--mut);font-size:13px}
+.slotbox .t{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+.slotbox .t b{color:var(--fg)}
+.slots{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:3px}
+.slots i{height:14px;border-radius:2px;background:var(--line2)}
+.slots i.f{background:var(--accent)}
+.msg{font-size:12.5px;color:var(--mut);line-height:1.55}
+.msg.err{color:var(--bad)}
+.msg b{color:var(--fg);font-weight:500}
+details.bk{border-top:1px solid var(--line);padding-top:10px}
+details.bk summary{cursor:pointer;font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+details.bk textarea{width:100%;min-height:70px;margin-top:8px;background:var(--panel2);border:1px solid var(--line2);border-radius:3px;padding:8px;font:11px var(--f-mono);color:var(--fg);resize:vertical}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px 14px;min-width:0}
+.kpi .l{font:500 10.5px var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+.kpi .v{font:600 28px/1.15 var(--f-mono);margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.kpi .v.acc{color:var(--accent)}
+.kpi .s{font-size:12px;color:var(--mut)}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{display:flex;align-items:center;gap:8px;border:1px solid var(--line2);background:var(--panel);border-radius:3px;padding:7px 12px}
+.tab:hover{border-color:var(--mut)}
+.tab[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.tab .dot{width:9px;height:9px;border-radius:2px;flex:none}
+.tab .nm{font:600 13px var(--f-body)}
+.tab .n{font:12px var(--f-mono);color:var(--mut)}
+
+.ins{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:22px}
+.ins-l .code{font:600 26px/1.15 var(--f-head);letter-spacing:.02em;text-wrap:balance}
+.ins-l .nm{font:500 12px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:8px 0 14px}
+.mini{display:grid;border-top:1px solid var(--line)}
+.mini div{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+.mini div span:first-child{color:var(--mut)}
+.mini div span:last-child{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.ins-r ul{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.ins-r li{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;align-items:baseline;max-width:880px}
+.ins-r li .t{font:500 10.5px var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+.ins-r li .x{font-size:14px}
+.ins-r li .x em{font-style:normal;font-family:var(--f-mono);font-size:13px}
+
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.charts svg{width:100%;height:auto;display:block;overflow:visible}
+.ax{fill:var(--mut);font:10.5px var(--f-mono)}
+.ax2{fill:var(--fg);font:11px var(--f-mono)}
+.gl{stroke:var(--line);stroke-width:1}
+.leg{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--mut)}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.heat{overflow-x:auto}
+.heat svg{display:block;height:auto;max-width:none}
+
+.mon{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.mon h3{margin:0 0 8px;font:500 11px var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+.mon h3 b{color:var(--fg);font-weight:600}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.sy{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);border-radius:3px;padding:2px 8px;font:12px var(--f-mono);background:var(--panel2)}
+.sy i{width:7px;height:7px;border-radius:2px}
+.empty{color:var(--mut);font-size:13px;margin:0}
+
+.tb{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=search],select{background:var(--panel2);border:1px solid var(--line2);border-radius:3px;padding:6px 9px;color:var(--fg)}
+.tw{overflow:auto;max-height:620px;border:1px solid var(--line);border-radius:3px;margin-top:10px}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:1040px}
+th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:nth-child(-n+4),td:nth-child(-n+4){text-align:left}
+table.ct th:nth-child(4),table.ct td:nth-child(4){text-align:right}
+thead th{position:sticky;top:0;background:var(--panel2);z-index:1;font:500 10.5px var(--f-mono);letter-spacing:.07em;text-transform:uppercase;color:var(--mut);padding:0}
+thead th button{all:unset;cursor:pointer;display:block;width:100%;padding:8px 10px;box-sizing:border-box}
+thead th button:hover{color:var(--fg)}
+thead th button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+thead th[aria-sort] button{color:var(--accent)}
+tbody tr:hover td{background:var(--accent-soft)}
+td.sym{font:600 13px var(--f-mono)}
+td.m{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.sd{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px}
+.pill{display:inline-block;font:600 10.5px var(--f-mono);letter-spacing:.05em;padding:2px 7px;border-radius:2px}
+.p0{background:var(--r4);color:var(--on4)} .p1{background:var(--r2);color:var(--on2)} .p2{background:var(--r1);color:var(--on1)}
+.pa{background:var(--accent);color:var(--accent-ink)} .pd{background:var(--r4);color:var(--on4)}
+.tag{font:500 10px var(--f-mono);letter-spacing:.05em;border:1px solid var(--accent);color:var(--accent);border-radius:2px;padding:1px 5px;margin-left:5px}
+
+#tip{position:fixed;z-index:50;pointer-events:none;background:var(--panel2);border:1px solid var(--line2);border-radius:3px;padding:7px 10px;font:12px/1.5 var(--f-mono);box-shadow:0 6px 20px rgba(0,0,0,.28);max-width:300px}
+#tip b{color:var(--accent);font-weight:600}
+.foot{color:var(--dim);font-size:12px;line-height:1.6}
+
+@media (max-width:980px){
+  .console,.ins,.mon,.charts{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:520px){
+  .ins-r li{grid-template-columns:minmax(0,1fr);gap:2px}
+  .kpi .v{font-size:24px}
+  .day{min-height:40px;padding:3px 4px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark">ATH</div>
+      <div><h1>ATH Crossing Monitor</h1><p>Stocks that closed above their previous all-time high, by sector</p></div>
+    </div>
+    <div class="top-r">
+      <div class="seg" role="group" aria-label="View"><button type="button" id="vDay" aria-pressed="true">DAY VIEW</button><button type="button" id="vCum" aria-pressed="false">20-DAY ANALYSIS</button></div>
+      <span class="chip" id="uniChip" hidden>UNIVERSE <b>–</b></span>
+      <span class="chip" id="asofChip">AS OF <b>–</b></span>
+      <button class="btn" id="themeBtn" type="button" aria-label="Toggle light or dark theme">Theme</button>
+    </div>
+  </header>
+
+  <section class="panel" aria-label="Calendar and upload">
+    <div class="ph"><h2>Data console</h2><span class="sub">Pick a trading day in the calendar, then upload that day's CSV. The latest 20 trading days are kept; a 21st day drops the oldest automatically.</span></div>
+    <div class="console">
+      <div>
+        <div class="cal-top"><button type="button" id="calPrev" aria-label="Previous month">‹</button><b id="calTitle"></b><button type="button" id="calNext" aria-label="Next month">›</button></div>
+        <div class="cal-grid" id="cal" role="group" aria-label="Trading calendar"></div>
+        <div class="cal-key"><span><i class="h"></i>Data saved</span><span><i class="m"></i>Weekday with no data</span><span><i></i>Holiday or empty</span></div>
+      </div>
+      <div class="rcol">
+        <div class="selbox">
+          <div><div class="lb2">Uploading to</div><div class="seld" id="selTxt"></div><div class="sub" id="selSub"></div></div>
+          <div class="row"><button class="btn pri" id="upBtn" type="button">Upload file for this day</button><button class="btn" id="holBtn" type="button">Mark as holiday</button><button class="btn" id="delBtn" type="button">Delete this day</button></div>
+        </div>
+        <div class="drop" id="drop">
+          <strong>Drop a CSV on the calendar day, or here</strong>
+          <p>One file goes to the selected day. To load several days at once, drop or choose all the files together and each one is filed under the date written inside it.</p>
+          <div class="row"><button class="btn" id="manyBtn" type="button">Choose several files</button><button class="btn" id="sample" type="button">Load sample data</button></div>
+          <input id="file" type="file" accept=".csv,text/csv,text/plain" hidden><input id="fileMany" type="file" accept=".csv,text/csv,text/plain" multiple hidden>
+        </div>
+        <div class="slotbox"><div class="t"><span>20-day window</span><span id="slotTxt"></span></div><div class="slots" id="slots" aria-hidden="true"></div></div>
+        <div class="msg" id="msg" role="status"></div>
+        <details class="bk"><summary>Backup and restore</summary>
+          <p class="sub" style="margin:8px 0">Your history lives in this browser only. Copy a backup now and then, and paste it back here to restore on another browser or device.</p>
+          <div class="row"><button class="btn" id="bkCopy" type="button">Copy backup</button><button class="btn" id="bkRestore" type="button">Restore from pasted text</button></div>
+          <textarea id="bkText" aria-label="Backup text" placeholder="Backup text appears here. Paste a backup here to restore it."></textarea>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <div class="view" id="dayView">
+    <div class="tape" id="tape" aria-label="Top movers"></div>
+    <section class="kpis" id="kpis" aria-label="Key figures"></section>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Sector"></nav>
+    <section class="panel ins" id="ins" aria-live="polite"></section>
+    <section class="charts">
+      <div class="panel"><div class="ph"><h2>Stocks by sector</h2><span class="sub">Count of stocks closing above the old high</span></div><div id="c1"></div></div>
+      <div class="panel"><div class="ph"><h2>How far past the old high</h2><span class="sub">Close vs previous all-time high</span></div><div id="c2"></div></div>
+      <div class="panel"><div class="ph"><h2>Breakout vs day move</h2><span class="sub">Each dot is one stock</span></div><div id="c3"></div></div>
+      <div class="panel"><div class="ph"><h2 id="t4">Stocks by industry</h2><span class="sub">Count within the selection</span></div><div id="c4"></div></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><h2>Daily change monitor</h2><span class="sub" id="monSub"></span></div>
+      <div class="mon" id="mon"></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><h2>Screener</h2><span class="sub" id="tblSub"></span></div>
+      <div class="tb">
+        <input id="q" type="search" placeholder="Search symbol or name" aria-label="Search symbol or name">
+        <select id="stf" aria-label="Filter by distance past old high">
+          <option value="">All distances</option><option value="0">Under 1% past</option><option value="1">1% to 3% past</option><option value="2">3% or more past</option>
+        </select>
+      </div>
+      <div class="tw"><table><thead><tr id="thr"></tr></thead><tbody id="tbody"></tbody></table></div>
+    </section>
+  </div>
+
+  <div class="view" id="cumView" hidden>
+    <section class="panel" id="cumEmpty" hidden><div class="ph"><h2>20-day analysis</h2></div><p class="empty" id="cumEmptyTxt"></p></section>
+    <div class="view" id="cumBody">
+      <section class="kpis" id="ckpis" aria-label="Window figures"></section>
+      <nav class="tabs" id="ctabs" role="tablist" aria-label="Sector filter"></nav>
+      <section class="panel ins" id="cins" aria-live="polite"></section>
+      <section class="charts">
+        <div class="panel"><div class="ph"><h2>Stocks per day</h2><span class="sub">Stacked by sector, one column per trading day</span></div><div id="d1"></div></div>
+        <div class="panel"><div class="ph"><h2>Sectors across the window</h2><span class="sub">Different stocks that crossed</span></div><div id="d2"></div></div>
+        <div class="panel"><div class="ph"><h2>Repeat crossers</h2><span class="sub">Days listed in the window</span></div><div id="d3"></div></div>
+        <div class="panel"><div class="ph"><h2>Move since first listed</h2><span class="sub">Latest listed close vs first listed close</span></div><div id="d4"></div></div>
+      </section>
+      <section class="panel"><div class="ph"><h2>Appearance map</h2><span class="sub" id="heatSub"></span></div><div class="heat" id="heat"></div></section>
+      <section class="panel">
+        <div class="ph"><h2>Window screener</h2><span class="sub" id="ctblSub"></span></div>
+        <div class="tb">
+          <input id="cq" type="search" placeholder="Search symbol or name" aria-label="Search symbol or name">
+          <select id="cstf" aria-label="Filter by status"><option value="">All stocks</option><option value="a">Still listed on the latest day</option><option value="d">Dropped off</option><option value="r">Listed more than once</option></select>
+        </div>
+        <div class="tw"><table class="ct"><thead><tr id="cthr"></tr></thead><tbody id="ctbody"></tbody></table></div>
+      </section>
+    </div>
+  </div>
+
+  <p class="foot" id="foot"></p>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+const SAMPLE = `Close Crossing All Time High,
+Date: 09-Nov-2026,
+Major Stocks,
+
+Stock Name,Symbol,Exch,Sector Name,Industry Name,All Time High,Chg % Since,Close,Chg %,Symbol with Comma for External Upload
+Divi's Laboratories Ltd.,DIVISLAB,NSE,Healthcare,Pharmaceuticals & Drugs,11194.00,3.32,11565.50,4.22,"DIVISLAB,"
+Aurobindo Pharma Ltd.,AUROPHARMA,NSE,Healthcare,Pharmaceuticals & Drugs,1816.10,2.16,1855.30,2.84,"AUROPHARMA,"
+Sai Life Sciences Ltd.,SAILIFE,NSE,Healthcare,Pharmaceuticals & Drugs,1814.90,1.21,1836.80,5.32,"SAILIFE,"
+ICICI Bank Ltd.,ICICIBANK,NSE,Banking,Bank - Private,1577.80,0.71,1589.00,1.53,"ICICIBANK,"
+Sona BLW Precision Forgings Ltd.,SONACOMS,NSE,Automobile & Ancillaries,Auto Ancillary,918.70,0.58,924.00,1.71,"SONACOMS,"
+Laurus Labs Ltd.,LAURUSLABS,NSE,Healthcare,Pharmaceuticals & Drugs,2441.90,0.50,2454.00,3.54,"LAURUSLABS,"
+Ather Energy Ltd.,ATHERENERG,NSE,Automobile & Ancillaries,Automobile Two & Three Wheelers,1859.00,0.04,1859.80,2.02,"ATHERENERG,"
+`;
+const SAMPLE_DATE='2026-11-09';
+const CAP=20;
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MFULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const num=v=>{const x=parseFloat(String(v).replace(/,/g,''));return isFinite(x)?x:NaN};
+const med=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2};
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+const sgn=(v,d=2)=>v==null?'–':(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'%';
+const fp=v=>v==null?'–':v.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const p2=n=>String(n).padStart(2,'0');
+const isoMs=iso=>Date.parse(iso+'T00:00:00Z');
+const dow=iso=>new Date(isoMs(iso)).getUTCDay();
+const addDays=(iso,n)=>new Date(isoMs(iso)+n*864e5).toISOString().slice(0,10);
+const dispIso=iso=>{const p=iso.split('-');return `${p[2]} ${MN[+p[1]-1]} ${p[0]}`};
+const dispLong=iso=>`${WD[dow(iso)]} ${dispIso(iso)}`;
+const shortIso=iso=>{const p=iso.split('-');return `${p[2]} ${MN[+p[1]-1]}`};
+const todayIso=()=>new Date().toLocaleDateString('en-CA');
+const monthOf=iso=>({y:+iso.slice(0,4),m:+iso.slice(5,7)-1});
+const keyOf=r=>r.sym+'|'+r.exch;
+const norm=h=>String(h).toUpperCase().replace(/[^A-Z0-9]/g,'');
+const trunc=(s,n=22)=>s.length>n?s.slice(0,n-1)+'…':s;
+const names=(arr,n=3,fn)=>arr.slice(0,n).map(fn||(r=>r.sym)).join(', ');
+const ST_LABEL=['UNDER 1% PAST','1–3% PAST','3%+ PAST'];
+const ISO_RE=/^\d{4}-\d{2}-\d{2}$/;
+
+/* ---------- parsing ---------- */
+function splitLine(l){const out=[];let cur='',q=false;for(const ch of l){if(ch==='"')q=!q;else if(ch===','&&!q){out.push(cur);cur=''}else cur+=ch}out.push(cur);return out.map(s=>s.trim())}
+function parseATH(text){
+  const lines=text.replace(/^﻿/,'').split(/\r?\n/);
+  let hi=-1;
+  for(let i=0;i<lines.length;i++){const n=splitLine(lines[i]).map(norm);if(n.includes('SYMBOL')&&n.includes('CLOSE')&&n.includes('ALLTIMEHIGH')){hi=i;break}}
+  if(hi<0)throw new Error('Could not find the column row. It needs Symbol, All Time High and Close.');
+  // Header lines: keep only the report date and the universe label. Any other line (account details) is dropped unread.
+  let date=null,universe=null;
+  lines.slice(0,hi).forEach((l,i)=>{
+    const t=l.replace(/,+\s*$/,'').trim();
+    if(!t||t.includes('@')||/^generated/i.test(t))return;
+    const m=/^date:\s*(\d{1,2})-([A-Za-z]{3})-(\d{4})/i.exec(t);
+    if(m&&MON[m[2].toLowerCase()]){date=`${m[3]}-${p2(MON[m[2].toLowerCase()])}-${p2(m[1])}`;return}
+    if(i>=2&&!universe&&t.length<60)universe=t;
+  });
+  const head=splitLine(lines[hi]).map(norm);
+  const ix={};['STOCKNAME','SYMBOL','EXCH','SECTORNAME','INDUSTRYNAME','ALLTIMEHIGH','CHGSINCE','CLOSE','CHG'].forEach(k=>ix[k]=head.indexOf(k));
+  const rows=[];
+  for(const l of lines.slice(hi+1)){
+    if(!l.replace(/,/g,'').trim())continue;
+    const c=splitLine(l),get=k=>ix[k]>=0?(c[ix[k]]||''):'';
+    const sym=get('SYMBOL').toUpperCase(),close=num(get('CLOSE')),ath=num(get('ALLTIMEHIGH'));
+    if(!sym||!isFinite(close))continue;
+    const since=num(get('CHGSINCE')),chg=num(get('CHG'));
+    rows.push({sym,name:get('STOCKNAME')||sym,exch:(get('EXCH')||'NSE').toUpperCase(),sec:get('SECTORNAME')||'Unclassified',ind:get('INDUSTRYNAME')||'Unclassified',
+      ath:isFinite(ath)?ath:0,close,chg:isFinite(chg)?chg:0,
+      past:isFinite(since)?since:(ath>0?(close/ath-1)*100:null)});
+  }
+  if(!rows.length)throw new Error('No usable rows found below the column row.');
+  const seenK=new Set(),uniq=rows.filter(r=>{const k=keyOf(r);if(seenK.has(k))return false;seenK.add(k);return true});
+  return {rows:uniq,date,universe,meta:{read:rows.length,kept:uniq.length}};
+}
+
+/* ---------- storage ---------- */
+const HK='ath.hist',HOL='ath.hol',COLK='ath.col';
+function loadHist(){try{const h=JSON.parse(localStorage.getItem(HK)||'{}');return h&&typeof h==='object'?h:{}}catch(e){return {}}}
+function saveHist(h){
+  const put=()=>localStorage.setItem(HK,JSON.stringify(h));
+  try{put()}catch(e){try{const ks=Object.keys(h).sort();if(ks.length>1){delete h[ks[0]];put()}}catch(e2){}}
+}
+function loadHol(){try{return new Set(JSON.parse(localStorage.getItem(HOL)||'[]'))}catch(e){return new Set()}}
+function saveHol(s){try{localStorage.setItem(HOL,JSON.stringify([...s]))}catch(e){}}
+const pack=rows=>rows.map(r=>[r.sym,r.name,r.exch,r.sec,r.ind,r.ath,r.past,r.close,r.chg]);
+const unpack=a=>a.map(x=>({sym:x[0],name:x[1],exch:x[2],sec:x[3],ind:x[4],ath:x[5],past:x[6],close:x[7],chg:x[8]}));
+function enforceCap(h){const ks=Object.keys(h).sort(),dropped=[];while(ks.length>CAP){const k=ks.shift();delete h[k];dropped.push(k)}return dropped}
+function saveDay(iso,p){
+  const h=loadHist(),ks=Object.keys(h).sort();
+  if(!h[iso]&&ks.length>=CAP&&iso<ks[0])throw new Error(`${dispLong(iso)} is older than the 20-day window (${dispIso(ks[0])} to ${dispIso(ks[ks.length-1])}), so it was not saved.`);
+  const replaced=!!h[iso];h[iso]=pack(p.rows);
+  const dropped=enforceCap(h);saveHist(h);
+  return {replaced,dropped};
+}
+
+/* ---------- state ---------- */
+const state={cur:null,view:'day',tab:'ALL',ctab:'ALL',sort:{k:'past',d:-1},csort:{k:'days',d:-1},q:'',stf:'',cq:'',cstf:'',sel:null,cal:monthOf(todayIso()),W:null,cmap:{}};
+function setCur(iso,rows,meta,sample,universe){
+  rows.forEach(r=>{r.st=r.past==null||r.past<1?0:r.past<3?1:2});
+  state.cur={iso,rows,meta,sample,universe};
+}
+function setFromHist(iso){const h=loadHist();if(!h[iso])return false;const rows=unpack(h[iso]);setCur(iso,rows,{read:rows.length,kept:rows.length},false,null);return true}
+function assignColors(){
+  const cnt={},h=loadHist();
+  Object.values(h).forEach(a=>a.forEach(x=>cnt[x[3]]=(cnt[x[3]]||0)+1));
+  if(state.cur&&state.cur.sample)state.cur.rows.forEach(r=>cnt[r.sec]=(cnt[r.sec]||0)+1);
+  let m={};try{m=JSON.parse(localStorage.getItem(COLK)||'{}')||{}}catch(e){}
+  const used=new Set(Object.values(m).filter(v=>v>0));
+  Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]||a.localeCompare(b)).forEach(s=>{
+    if(s in m)return;let slot=0;for(let i=1;i<=6;i++)if(!used.has(i)){slot=i;break}
+    m[s]=slot;if(slot)used.add(slot);
+  });
+  try{localStorage.setItem(COLK,JSON.stringify(m))}catch(e){}
+  state.cmap=m;
+}
+const col=sec=>{const v=state.cmap[sec];return v?`var(--s${v})`:'var(--s0)'};
+const secSort=(a,b)=>((state.cmap[a]||99)-(state.cmap[b]||99))||a.localeCompare(b);
+const sectorsOf=rows=>[...new Set(rows.map(r=>r.sec))].sort(secSort);
+
+/* ---------- window model ---------- */
+function slotList(dates,hol){
+  if(!dates.length)return [];
+  const out=[],end=dates[dates.length-1],have=new Set(dates);
+  for(let d=dates[0];d<=end;d=addDays(d,1)){const w=dow(d);if(have.has(d)||(w!==0&&w!==6&&!hol.has(d)))out.push(d)}
+  return out;
+}
+function buildWindow(){
+  const h=loadHist(),dates=Object.keys(h).sort(),hol=loadHol(),slots=slotList(dates,hol);
+  const sidx={};slots.forEach((d,i)=>sidx[d]=i);
+  const perDay={},sets={},map=new Map();
+  dates.forEach(d=>{
+    const rows=unpack(h[d]);perDay[d]=rows;sets[d]=new Set(rows.map(keyOf));
+    rows.forEach(r=>{
+      const k=keyOf(r);let s=map.get(k);if(!s){s={key:k,sym:r.sym,name:r.name,exch:r.exch,apps:[]};map.set(k,s)}
+      s.apps.push({iso:d,close:r.close,chg:r.chg,past:r.past,ath:r.ath});s.sec=r.sec;s.ind=r.ind;s.name=r.name;
+    });
+  });
+  const last=dates[dates.length-1];
+  const stocks=[...map.values()].map(s=>{
+    const a=s.apps,f=a[0],l=a[a.length-1];
+    s.days=a.length;s.first=f;s.last=l;s.fi=f.iso;s.li=l.iso;s.fc=f.close;s.lc=l.close;
+    s.move=a.length>1&&f.close>0?(l.close/f.close-1)*100:null;
+    s.avgChg=avg(a.map(x=>x.chg));s.active=l.iso===last;
+    let re=0;for(let i=1;i<a.length;i++)if(sidx[a[i].iso]-sidx[a[i-1].iso]>1)re++;
+    s.re=re;return s;
+  });
+  return {dates,slots,hol,sidx,perDay,sets,stocks,last,missing:slots.filter(d=>!perDay[d])};
+}
+function streakOf(W,key,iso){let n=0;for(let i=W.sidx[iso];i>=0;i--){const s=W.sets[W.slots[i]];if(s&&s.has(key))n++;else break}return n}
+
+/* ---------- messages ---------- */
+function setMsg(html,err){const m=$('#msg');m.className='msg'+(err?' err':'');m.innerHTML=html}
+const setErr=t=>setMsg(esc(t),true);
+
+/* ---------- selection & upload ---------- */
+function nextOpen(from){
+  const h=loadHist(),hol=loadHol(),t=todayIso();let d=addDays(from,1);
+  for(let i=0;i<14;i++){if(d>t)return from;const w=dow(d);if(w!==0&&w!==6&&!hol.has(d)&&!h[d])return d;d=addDays(d,1)}
+  return from;
+}
+function initSel(){
+  const ks=Object.keys(loadHist()).sort();
+  if(ks.length){state.sel=nextOpen(ks[ks.length-1])}
+  else{let d=todayIso();while(dow(d)===0||dow(d)===6)d=addDays(d,-1);state.sel=d}
+  state.cal=monthOf(state.sel);
+}
+function selectDay(iso){
+  state.sel=iso;state.cal=monthOf(iso);
+  if(loadHist()[iso]){setFromHist(iso);state.tab='ALL';setMsg(`Showing <b>${dispLong(iso)}</b>. Upload a file to replace this day, or delete it.`)}
+  else setMsg(`Selected <b>${dispLong(iso)}</b>. No data yet. Use the upload button, or drop a file on this day.`);
+  renderAll();
+}
+function uploadOne(text,name,iso){
+  const p=parseATH(text),r=saveDay(iso,p);
+  setFromHist(iso);state.tab='ALL';
+  let note=`<b>${esc(name)}</b> saved to <b>${dispLong(iso)}</b>: ${p.meta.kept} unique stocks.`;
+  if(r.replaced)note+=' It replaced the data already on that day.';
+  if(p.date&&p.date!==iso)note+=` <span class="dn">The file's own date is ${dispIso(p.date)}, but you chose ${dispIso(iso)}, so it went under ${dispIso(iso)}. Delete it and pick the right day if that is wrong.</span>`;
+  if(r.dropped.length)note+=` Dropped the oldest day (${r.dropped.map(dispIso).join(', ')}) to keep ${CAP}.`;
+  const nx=nextOpen(iso);state.sel=nx;state.cal=monthOf(nx);
+  if(nx!==iso)note+=` Next day to fill: <b>${dispLong(nx)}</b>.`;
+  setMsg(note);renderAll();
+}
+function uploadMany(items){
+  const ok=[],skip=[];
+  items.forEach(it=>{try{const p=parseATH(it.text);if(!p.date)skip.push(`${it.name} (no date inside the file)`);else ok.push({name:it.name,p})}catch(e){skip.push(`${it.name} (${e.message})`)}});
+  ok.sort((a,b)=>a.p.date.localeCompare(b.p.date));
+  const saved=[],dropped=[];
+  ok.forEach(o=>{try{const r=saveDay(o.p.date,o.p);saved.push(o.p.date);dropped.push(...r.dropped)}catch(e){skip.push(`${o.name} (${e.message})`)}});
+  const ks=Object.keys(loadHist()).sort();
+  if(ks.length){setFromHist(ks[ks.length-1]);state.tab='ALL';const nx=nextOpen(ks[ks.length-1]);state.sel=nx;state.cal=monthOf(nx)}
+  let note=saved.length?`Saved <b>${saved.length}</b> ${saved.length===1?'day':'days'}: ${saved.map(shortIso).join(', ')}.`:'No days were saved.';
+  if(dropped.length)note+=` Dropped the oldest ${dropped.length===1?'day':'days'} (${dropped.map(shortIso).join(', ')}) to keep ${CAP}.`;
+  if(skip.length)note+=` <span class="dn">Skipped: ${skip.map(esc).join('; ')}.</span> Files without a date can be added one by one with the calendar.`;
+  setMsg(note,!saved.length);renderAll();
+}
+const readText=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result));r.onerror=()=>rej(new Error('A file could not be read.'));r.readAsText(f)});
+async function handleFiles(files,iso){
+  files=[...files];if(!files.length)return;
+  try{
+    if(files.length===1)uploadOne(await readText(files[0]),files[0].name,iso||state.sel);
+    else uploadMany(await Promise.all(files.map(async f=>({name:f.name,text:await readText(f)}))));
+  }catch(e){setErr(e.message)}
+}
+function deleteDay(iso){
+  const h=loadHist();if(!h[iso])return;
+  delete h[iso];saveHist(h);
+  const ks=Object.keys(h).sort();
+  if(state.cur&&!state.cur.sample&&state.cur.iso===iso){if(ks.length)setFromHist(ks[ks.length-1]);else loadSample(true)}
+  setMsg(`Deleted <b>${dispLong(iso)}</b>.`);renderAll();
+}
+function toggleHoliday(iso){
+  if(loadHist()[iso]){setErr('This day has data. Delete the data first if it was a holiday.');return}
+  const s=loadHol();if(s.has(iso))s.delete(iso);else s.add(iso);saveHol(s);
+  setMsg(`${dispLong(iso)} is ${s.has(iso)?'marked as a market holiday and will not be flagged as missing':'no longer marked as a holiday'}.`);renderAll();
+}
+function loadSample(skipRender){
+  const p=parseATH(SAMPLE);setCur(SAMPLE_DATE,p.rows,p.meta,true,p.universe);state.tab='ALL';
+  if(!skipRender){setMsg(`<b>Sample data</b> (your attached file): ${p.meta.kept} stocks. It is not saved. Pick a day and upload to start your history.`);renderAll()}
+}
+function backupText(){return JSON.stringify({v:1,hist:loadHist(),hol:[...loadHol()]})}
+function restore(text){
+  let o;try{o=JSON.parse(text)}catch(e){throw new Error('That text is not a valid backup.')}
+  if(!o||typeof o.hist!=='object')throw new Error('That text is not a valid backup.');
+  const h=loadHist();let n=0;
+  Object.keys(o.hist).forEach(k=>{const a=o.hist[k];if(ISO_RE.test(k)&&Array.isArray(a)&&a.every(x=>Array.isArray(x)&&x.length>=9)){h[k]=a;n++}});
+  const dropped=enforceCap(h);saveHist(h);
+  const hs=loadHol();(Array.isArray(o.hol)?o.hol:[]).forEach(d=>{if(ISO_RE.test(d))hs.add(d)});saveHol(hs);
+  const ks=Object.keys(h).sort();if(ks.length){setFromHist(ks[ks.length-1]);initSel()}
+  setMsg(`Restored <b>${n}</b> ${n===1?'day':'days'} from the backup.${dropped.length?` Kept the latest ${CAP}, dropped ${dropped.length} older.`:''}`);renderAll();
+}
+
+/* ---------- charts ---------- */
+const tipA=h=>`data-tip="${esc(h)}"`;
+const legend=items=>`<div class="leg">${items.map(i=>`<span><i style="background:${i.c}"></i>${esc(i.l)}</span>`).join('')}</div>`;
+function niceTicks(min,max,n=5){
+  if(max<=min)max=min+1;
+  const raw=(max-min)/n,mag=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/mag,step=(f<=1?1:f<=2?2:f<=5?5:10)*mag;
+  const lo=Math.floor(min/step+1e-9)*step,hi=Math.ceil(max/step-1e-9)*step,t=[];
+  for(let v=lo;v<=hi+step/2;v+=step)t.push(+v.toFixed(10));
+  return {lo,hi,t};
+}
+function hbars(items,fmt,aria,L=150){
+  if(!items.length)return '<p class="empty">Nothing to show.</p>';
+  const rh=28,W=560,H=items.length*rh+4,bw=W-L-72,mx=Math.max(...items.map(i=>i.v),0.0001);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">`;
+  items.forEach((it,i)=>{
+    const y=i*rh+2,w=it.v>0?Math.max(it.v/mx*bw,3):0;
+    s+=`<g style="opacity:${it.dim?.35:1}"><text class="ax2" x="0" y="${y+16}">${esc(trunc(it.l,Math.floor(L/6.6)))}</text>`+
+      `<rect x="${L}" y="${y+3}" width="${w}" height="18" rx="2" style="fill:${it.c}"/><text class="ax2" x="${L+w+6}" y="${y+16}">${fmt(it.v)}</text>`+
+      `<rect x="0" y="${y}" width="${W}" height="${rh-2}" fill="transparent" ${tipA(it.tip)}/></g>`;
+  });
+  return s+'</svg>';
+}
+/* day view charts */
+function chartSector(all){
+  const g={};all.forEach(r=>(g[r.sec]||(g[r.sec]=[])).push(r));
+  const secs=Object.keys(g).sort((a,b)=>g[b].length-g[a].length||a.localeCompare(b));
+  return hbars(secs.map(s=>({l:s,v:g[s].length,c:col(s),dim:state.tab!=='ALL'&&state.tab!==s,
+    tip:`<b>${esc(s)}</b> · ${g[s].length} stocks<br>${esc(names(g[s],6))}<br>Median day move ${sgn(med(g[s].map(r=>r.chg)))}`})),v=>v,'Stocks by sector');
+}
+function chartRank(rows){
+  const a=rows.filter(r=>r.past!=null).sort((x,y)=>y.past-x.past).slice(0,12);
+  return hbars(a.map(r=>({l:r.sym,v:Math.max(r.past,0),c:col(r.sec),tip:`<b>${esc(r.name)}</b><br>${esc(r.sec)}<br>Old high ₹${fp(r.ath)}<br>Close ₹${fp(r.close)}<br>${sgn(r.past)} past the old high`})),v=>sgn(v),'Distance past the old all-time high',110)+
+    legend(sectorsOf(a).map(s=>({c:col(s),l:s})));
+}
+function chartScatter(rows){
+  if(!rows.length)return '<p class="empty">Nothing to show.</p>';
+  const W=560,H=300,L=46,R=18,T=14,B=44;
+  const xs=rows.map(r=>Math.max(r.past||0,0)),ys=rows.map(r=>r.chg);
+  const X=niceTicks(0,Math.max(...xs,1)),Y=niceTicks(Math.min(0,...ys),Math.max(0,...ys));
+  const sx=v=>L+(v-X.lo)/(X.hi-X.lo)*(W-L-R),sy=v=>T+(1-(v-Y.lo)/(Y.hi-Y.lo))*(H-T-B);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Breakout size against day move">`;
+  Y.t.forEach(v=>{s+=`<line class="gl" x1="${L}" x2="${W-R}" y1="${sy(v)}" y2="${sy(v)}" ${v===0?'style="stroke:var(--line2)"':''}/><text class="ax" x="${L-6}" y="${sy(v)+3.5}" text-anchor="end">${v}</text>`});
+  X.t.forEach(v=>{s+=`<text class="ax" x="${sx(v)}" y="${H-B+16}" text-anchor="middle">${v}</text>`});
+  s+=`<text class="ax" x="${(L+W-R)/2}" y="${H-6}" text-anchor="middle">% past old high</text><text class="ax" x="12" y="${(T+H-B)/2}" text-anchor="middle" transform="rotate(-90 12 ${(T+H-B)/2})">day change %</text>`;
+  const lab=new Set(rows.length<=10?rows.map(r=>r.sym):[...rows].sort((a,b)=>Math.abs(b.chg)-Math.abs(a.chg)).slice(0,5).map(r=>r.sym));
+  rows.forEach(r=>{
+    const cx=sx(Math.max(r.past||0,0)),cy=sy(r.chg);
+    s+=`<circle cx="${cx}" cy="${cy}" r="6" style="fill:${col(r.sec)};stroke:var(--panel);stroke-width:2"/>`;
+    if(lab.has(r.sym)){const left=cx>W-R-70;s+=`<text class="ax2" x="${cx+(left?-10:10)}" y="${cy+4}" text-anchor="${left?'end':'start'}">${esc(r.sym)}</text>`}
+    s+=`<circle cx="${cx}" cy="${cy}" r="13" fill="transparent" ${tipA(`<b>${esc(r.name)}</b><br>${esc(r.sec)}<br>${sgn(r.past)} past the old high<br>Day change ${sgn(r.chg)}`)}/>`;
+  });
+  return s+'</svg>'+legend(sectorsOf(rows).map(x=>({c:col(x),l:x})));
+}
+function chartIndustry(rows){
+  const g={};rows.forEach(r=>(g[r.ind]||(g[r.ind]=[])).push(r));
+  const items=Object.keys(g).sort((a,b)=>g[b].length-g[a].length||a.localeCompare(b)).slice(0,10).map(k=>({l:k,v:g[k].length,c:col(g[k][0].sec),tip:`<b>${esc(k)}</b> · ${g[k].length} stocks<br>${esc(names(g[k],6))}`}));
+  return hbars(items,v=>v,'Stocks by industry',190);
+}
+/* window charts */
+function chartDaily(W,sec){
+  const slots=W.slots,V=560,H=250,L=34,R=6,T=18,B=40,iw=V-L-R,ih=H-T-B,band=iw/slots.length,bw=Math.min(26,band*.68);
+  const data=slots.map(d=>{const rows=(W.perDay[d]||[]).filter(r=>!sec||r.sec===sec),c={};rows.forEach(r=>c[r.sec]=(c[r.sec]||0)+1);return {d,n:rows.length,c,miss:!W.perDay[d]}});
+  const nm=niceTicks(0,Math.max(1,...data.map(x=>x.n)),4),base=T+ih,secs=sectorsOf(W.dates.flatMap(d=>W.perDay[d]).filter(r=>!sec||r.sec===sec));
+  let s=`<svg viewBox="0 0 ${V} ${H}" role="img" aria-label="Stocks per trading day">`;
+  nm.t.forEach(v=>{const y=base-v/nm.hi*ih;s+=`<line class="gl" x1="${L}" x2="${V-R}" y1="${y}" y2="${y}"/><text class="ax" x="${L-6}" y="${y+3.5}" text-anchor="end">${v}</text>`});
+  data.forEach((x,i)=>{
+    const cx=L+band*i+band/2,bx=cx-bw/2;let cur=base;
+    secs.forEach(k=>{const c=x.c[k];if(!c)return;const h=c/nm.hi*ih;s+=`<rect x="${bx}" y="${cur-h+1}" width="${bw}" height="${Math.max(h-2,1)}" rx="2" style="fill:${col(k)}"/>`;cur-=h});
+    if(x.n)s+=`<text class="ax2" x="${cx}" y="${cur-5}" text-anchor="middle">${x.n}</text>`;
+    if(x.miss)s+=`<text class="ax" x="${cx}" y="${base-5}" text-anchor="middle" style="fill:var(--bad)">–</text>`;
+    s+=`<text class="ax" x="${cx}" y="${base+14}" text-anchor="middle">${x.d.slice(8)}</text>`;
+    if(i===0||x.d.slice(5,7)!==data[i-1].d.slice(5,7))s+=`<text class="ax" x="${cx}" y="${base+28}" text-anchor="middle">${MN[+x.d.slice(5,7)-1]}</text>`;
+    const tt=x.miss?`<b>${esc(dispLong(x.d))}</b><br>No data uploaded`:`<b>${esc(dispLong(x.d))}</b> · ${x.n} stocks`+secs.filter(k=>x.c[k]).map(k=>`<br>${esc(k)}: ${x.c[k]}`).join('');
+    s+=`<rect x="${L+band*i}" y="${T}" width="${band}" height="${ih+24}" fill="transparent" ${tipA(tt)}/>`;
+  });
+  return s+'</svg>'+legend(secs.map(k=>({c:col(k),l:k})));
+}
+function chartSectorWin(stocks){
+  const g={};stocks.forEach(s=>(g[s.sec]||(g[s.sec]=[])).push(s));
+  const secs=Object.keys(g).sort((a,b)=>g[b].length-g[a].length||a.localeCompare(b));
+  return hbars(secs.map(k=>({l:k,v:g[k].length,c:col(k),tip:`<b>${esc(k)}</b> · ${g[k].length} different stocks<br>${g[k].reduce((a,s)=>a+s.days,0)} listings in total`})),v=>v,'Different stocks per sector in the window');
+}
+function chartRepeat(stocks){
+  const a=[...stocks].sort((x,y)=>y.days-x.days||y.li.localeCompare(x.li)||x.sym.localeCompare(y.sym)).slice(0,12);
+  if(!a.length||a[0].days<2)return '<p class="empty">No stock has been listed on more than one day yet.</p>';
+  return hbars(a.map(s=>({l:s.sym,v:s.days,c:col(s.sec),tip:`<b>${esc(s.name)}</b><br>${s.days} days: ${esc(s.apps.map(x=>shortIso(x.iso)).join(', '))}`})),v=>v+'d','Days listed per stock',110)+legend(sectorsOf(a).map(k=>({c:col(k),l:k})));
+}
+function chartMove(stocks){
+  let a=stocks.filter(s=>s.move!=null).sort((x,y)=>y.move-x.move);
+  if(!a.length)return '<p class="empty">Needs a stock listed on at least two days.</p>';
+  if(a.length>14)a=[...a.slice(0,7),...a.slice(-7)];
+  const V=560,L=112,R=70,rh=27,H=a.length*rh+4,mn=Math.min(0,...a.map(s=>s.move)),mx=Math.max(0,...a.map(s=>s.move)),sc=(V-L-R)/((mx-mn)||1),x0=L+(-mn)*sc;
+  let s=`<svg viewBox="0 0 ${V} ${H}" role="img" aria-label="Move since first listed close">`;
+  s+=`<line x1="${x0}" x2="${x0}" y1="0" y2="${H}" style="stroke:var(--line2)"/>`;
+  a.forEach((st,i)=>{
+    const y=i*rh+2,w=Math.max(Math.abs(st.move)*sc,2),pos=st.move>=0,x=pos?x0:x0-w;
+    s+=`<rect x="0" y="${y+7}" width="9" height="9" rx="2" style="fill:${col(st.sec)}"/><text class="ax2" x="16" y="${y+16}">${esc(trunc(st.sym,11))}</text>`+
+      (Math.abs(st.move)<0.005?'':`<rect x="${x}" y="${y+3}" width="${w}" height="18" rx="2" style="fill:var(${pos?'--good':'--bad'})"/>`)+
+      `<text class="ax2" x="${pos?x+w+6:x-6}" y="${y+16}" text-anchor="${pos?'start':'end'}">${sgn(st.move)}</text>`+
+      `<rect x="0" y="${y}" width="${V}" height="${rh-2}" fill="transparent" ${tipA(`<b>${esc(st.name)}</b><br>First listed ${shortIso(st.fi)} at ₹${fp(st.fc)}<br>Latest listed ${shortIso(st.li)} at ₹${fp(st.lc)}<br>${sgn(st.move)} over ${st.days} listings`)}/>`;
+  });
+  return s+'</svg>';
+}
+function chartHeat(W,stocks){
+  const list=[...stocks].sort((a,b)=>b.days-a.days||b.li.localeCompare(a.li)||a.sym.localeCompare(b.sym)).slice(0,40);
+  if(!list.length)return '<p class="empty">Nothing to show.</p>';
+  const cw=26,rh=20,L=124,T=36,slots=W.slots,V=L+slots.length*cw+8,H=T+list.length*rh+6;
+  let s=`<svg viewBox="0 0 ${V} ${H}" style="width:${V}px" role="img" aria-label="Which stocks were listed on which days">`;
+  slots.forEach((d,i)=>{
+    const cx=L+i*cw+cw/2,miss=!W.perDay[d];
+    s+=`<text class="ax" x="${cx}" y="${T-18}" text-anchor="middle" ${miss?'style="fill:var(--bad)"':''}>${d.slice(8)}</text>`;
+    if(i===0||d.slice(5,7)!==slots[i-1].slice(5,7))s+=`<text class="ax" x="${cx}" y="${T-6}" text-anchor="middle">${MN[+d.slice(5,7)-1]}</text>`;
+  });
+  list.forEach((st,ri)=>{
+    const y=T+ri*rh,have=new Map(st.apps.map(a=>[a.iso,a]));
+    s+=`<text class="ax2" x="0" y="${y+14}">${esc(trunc(st.sym,12))}</text><text class="ax" x="${L-8}" y="${y+14}" text-anchor="end">${st.days}d</text>`;
+    slots.forEach((d,i)=>{
+      const a=have.get(d),x=L+i*cw+1;
+      if(a)s+=`<rect x="${x}" y="${y+1}" width="${cw-3}" height="${rh-3}" rx="2" style="fill:${col(st.sec)}" ${tipA(`<b>${esc(st.sym)}</b> · ${esc(dispLong(d))}<br>Close ₹${fp(a.close)}<br>Day change ${sgn(a.chg)}<br>${sgn(a.past)} past the old high`)}/>`;
+      else s+=`<rect x="${x}" y="${y+1}" width="${cw-3}" height="${rh-3}" rx="2" style="fill:none;stroke:var(--line);${W.perDay[d]?'':'stroke-dasharray:3 2'}"/>`;
+    });
+  });
+  return s+'</svg>';
+}
+
+/* ---------- insights ---------- */
+function visible(){return state.tab==='ALL'?state.cur.rows:state.cur.rows.filter(r=>r.sec===state.tab)}
+function insights(rows,key,all){
+  const n=rows.length,out=[];
+  if(!n)return [{t:'Sector',x:'No stocks in this sector today.'}];
+  const fresh=rows.filter(r=>r.st===0),ext=rows.filter(r=>r.st===2);
+  const inds=[...new Set(rows.map(r=>r.ind))];
+  out.push({t:'Breadth',x:`<em>${n}</em> ${n===1?'stock':'stocks'}, ${(n/all.length*100).toFixed(0)}% of the list, in <em>${inds.length}</em> ${inds.length===1?'industry':'industries'}. <em>${fresh.length}</em> closed less than 1% past the old high and <em>${ext.length}</em> closed 3% or more past it.`});
+  const up=rows.filter(r=>r.chg>0).length,dn=rows.filter(r=>r.chg<0).length;
+  const by=[...rows].sort((a,b)=>b.chg-a.chg),best=by[0],worst=by[n-1];
+  out.push({t:'Momentum',x:`${up} up, ${dn} down on the day, median move <em>${sgn(med(rows.map(r=>r.chg)))}</em>. `+(n>1?`Leader <em>${esc(best.sym)} ${sgn(best.chg)}</em>, laggard <em>${esc(worst.sym)} ${sgn(worst.chg)}</em>.`:`<em>${esc(best.sym)} ${sgn(best.chg)}</em>.`)});
+  const pr=rows.filter(r=>r.past!=null).sort((a,b)=>b.past-a.past);
+  if(pr.length){
+    const w=pr[0],t=pr[pr.length-1];
+    out.push({t:'Breakout',x:`Median close is <em>${sgn(med(pr.map(r=>r.past)))}</em> past the old high. `+(pr.length>1?`Furthest is <em>${esc(w.sym)} ${sgn(w.past)}</em> (₹${fp(w.ath)} to ₹${fp(w.close)}), closest is <em>${esc(t.sym)} ${sgn(t.past)}</em>.`:`<em>${esc(w.sym)}</em> went from ₹${fp(w.ath)} to ₹${fp(w.close)}.`)});
+    const thin=pr.filter(r=>r.past<0.75);
+    if(thin.length)out.push({t:'Thin margin',x:`<em>${thin.length}</em> closed less than 0.75% above the old high: <em>${esc(names(thin,4,r=>`${r.sym} ${sgn(r.past)}`))}</em>. A small dip tomorrow puts ${thin.length===1?'it':'them'} back below the old level.`});
+  }
+  const strong=rows.filter(r=>r.chg>=3).sort((a,b)=>b.chg-a.chg);
+  if(strong.length)out.push({t:'Strong close',x:`<em>${strong.length}</em> gained 3% or more on the day, so the cross came with buying: <em>${esc(names(strong,4,r=>`${r.sym} ${sgn(r.chg)}`))}</em>.`});
+  const weak=rows.filter(r=>r.chg<0);
+  if(weak.length)out.push({t:'Slipping',x:`<em>${weak.length}</em> closed down on the day despite crossing: <em>${esc(names(weak,4,r=>`${r.sym} ${sgn(r.chg)}`))}</em>.`});
+  if(key==='ALL'){
+    const sc={};rows.forEach(r=>(sc[r.sec]||(sc[r.sec]=[])).push(r));
+    const secs=Object.keys(sc).map(s=>({s,n:sc[s].length,m:med(sc[s].map(r=>r.chg))})).sort((a,b)=>b.n-a.n);
+    const top=secs[0],ind={};rows.filter(r=>r.sec===top.s).forEach(r=>ind[r.ind]=(ind[r.ind]||0)+1);
+    const topInd=Object.entries(ind).sort((a,b)=>b[1]-a[1])[0];
+    out.push({t:'Concentration',x:`<em>${esc(top.s)}</em> holds <em>${top.n} of ${n}</em> (${(top.n/n*100).toFixed(0)}%)${top.n/n>0.5?', so the list leans on one theme':''}. Largest industry: <em>${esc(topInd[0])}</em> with ${topInd[1]}.`});
+    if(secs.length>1){const mv=[...secs].sort((a,b)=>b.m-a.m)[0];out.push({t:'By sector',x:`<em>${esc(mv.s)}</em> has the strongest median day move (${sgn(mv.m)}). ${secs.map(x=>`${esc(x.s)} ${x.n}`).join(', ')}.`})}
+  }else{
+    const ind={};rows.forEach(r=>ind[r.ind]=(ind[r.ind]||0)+1);
+    out.push({t:'Industries',x:Object.entries(ind).sort((a,b)=>b[1]-a[1]).map(x=>`<em>${esc(x[0])}</em> ${x[1]}`).join(', ')+'.'});
+  }
+  return out;
+}
+function cumInsights(W,stocks,sec){
+  const out=[],N=W.dates.length,last=W.last;
+  const rowsBy=d=>(W.perDay[d]||[]).filter(r=>!sec||r.sec===sec);
+  const counts=W.dates.map(d=>({d,n:rowsBy(d).length}));
+  const busy=[...counts].sort((a,b)=>b.n-a.n)[0],quiet=[...counts].sort((a,b)=>a.n-b.n)[0];
+  const rep=stocks.filter(s=>s.days>1);
+  if(!stocks.length)return [{t:'Window',x:'No stocks in this sector across the loaded days.'}];
+  out.push({t:'Coverage',x:`<em>${N}</em> trading days loaded, ${dispIso(W.dates[0])} to ${dispIso(last)}. <em>${stocks.length}</em> different stocks crossed an all-time high and <em>${rep.length}</em> of them did it on more than one day.`});
+  out.push({t:'Activity',x:`Busiest day <em>${shortIso(busy.d)} (${busy.n})</em>, quietest <em>${shortIso(quiet.d)} (${quiet.n})</em>, average <em>${avg(counts.map(c=>c.n)).toFixed(1)}</em> a day.`});
+  const thr=Math.max(2,Math.ceil(N/2)),pers=stocks.filter(s=>s.days>=thr).sort((a,b)=>b.days-a.days||a.sym.localeCompare(b.sym));
+  if(pers.length)out.push({t:'Persistent',x:`<em>${pers.length}</em> ${pers.length===1?'stock was':'stocks were'} listed on ${thr} or more days: <em>${esc(names(pers,5,s=>`${s.sym} (${s.days}d)`))}</em>. Repeated closes above a rising all-time high suggest a sustained trend.`});
+  else{const top=[...stocks].sort((a,b)=>b.days-a.days)[0];out.push({t:'Persistent',x:`No stock has been listed on ${thr} or more days yet. Most repeated: <em>${esc(top.sym)} (${top.days}d)</em>.`})}
+  const gone=stocks.filter(s=>s.days===1&&!s.active);
+  if(gone.length)out.push({t:'One-day names',x:`<em>${gone.length}</em> appeared once and have not returned: <em>${esc(names(gone,5))}</em>.`});
+  const mv=stocks.filter(s=>s.move!=null).sort((a,b)=>b.move-a.move);
+  if(mv.length){
+    const lowest=mv[mv.length-1];
+    out.push({t:'Since first cross',x:`Best <em>${esc(names(mv.slice(0,3),3,s=>`${s.sym} ${sgn(s.move)}`))}</em>. `+(lowest.move<0?`Weakest <em>${esc(names(mv.slice(-3).reverse(),3,s=>`${s.sym} ${sgn(s.move)}`))}</em>.`:'None has closed below its first listed close.')+` Measured between the first and latest day each stock was listed.`});
+  }
+  const rex=stocks.filter(s=>s.re>0);
+  if(rex.length)out.push({t:'Re-entries',x:`<em>${rex.length}</em> dropped off the list and came back: <em>${esc(names(rex,5))}</em>.`});
+  if(!sec&&N>=4){
+    const h=Math.floor(N/2),a=W.dates.slice(0,h),b=W.dates.slice(h),share=ds=>{const c={};let t=0;ds.forEach(d=>W.perDay[d].forEach(r=>{c[r.sec]=(c[r.sec]||0)+1;t++}));return {c,t}};
+    const A=share(a),B=share(b),secs=[...new Set([...Object.keys(A.c),...Object.keys(B.c)])];
+    const dl=secs.map(s=>({s,a:(A.c[s]||0)/(A.t||1)*100,b:(B.c[s]||0)/(B.t||1)*100})).map(x=>({...x,d:x.b-x.a})).sort((x,y)=>y.d-x.d);
+    const up=dl[0],dn=dl[dl.length-1];
+    if(up.d>=10||dn.d<=-10)out.push({t:'Sector shift',x:`<em>${esc(up.s)}</em> went from ${up.a.toFixed(0)}% of listings in the first half of the window to ${up.b.toFixed(0)}% in the second half`+(dn.d<=-10?`, while <em>${esc(dn.s)}</em> fell from ${dn.a.toFixed(0)}% to ${dn.b.toFixed(0)}%`:'')+'.'});
+    else out.push({t:'Sector shift',x:'The sector mix has been steady. No sector moved more than 10 points of share between the two halves of the window.'});
+  }
+  if(N>=2){
+    const prev=W.dates[N-2],ps=new Set((W.perDay[prev]||[]).filter(r=>!sec||r.sec===sec).map(keyOf)),cs=rowsBy(last);
+    const nw=cs.filter(r=>!ps.has(keyOf(r))),gn=[...ps].length-cs.filter(r=>ps.has(keyOf(r))).length;
+    out.push({t:'Latest day',x:`${dispIso(last)}: <em>${cs.length}</em> listed, <em>${nw.length}</em> new since ${shortIso(prev)}`+(nw.length?` (${esc(names(nw,4))})`:'')+`, <em>${gn}</em> dropped off.`});
+  }
+  return out;
+}
+
+/* ---------- renderers ---------- */
+function renderChrome(){
+  const W=state.W,c=state.cur,h=loadHist(),hol=loadHol(),t=todayIso();
+  $('#asofChip').innerHTML=`AS OF <b>${dispIso(c.iso)}</b>${c.sample?' · SAMPLE':''}`;
+  const u=$('#uniChip');if(c.universe){u.hidden=false;u.innerHTML=`UNIVERSE <b>${esc(c.universe)}</b>`}else u.hidden=true;
+  $('#vDay').setAttribute('aria-pressed',String(state.view==='day'));$('#vCum').setAttribute('aria-pressed',String(state.view==='cum'));
+  $('#dayView').hidden=state.view!=='day';$('#cumView').hidden=state.view!=='cum';
+  // calendar
+  const {y,m}=state.cal,first=new Date(Date.UTC(y,m,1)),pad=(first.getUTCDay()+6)%7,dim=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+  const full=W.dates.length>=CAP,oldest=W.dates[0],miss=new Set(W.missing);
+  $('#calTitle').textContent=`${MFULL[m]} ${y}`;
+  let html=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="dow">${d}</div>`).join('');
+  for(let i=0;i<pad;i++)html+='<div class="day pad" aria-hidden="true"></div>';
+  for(let d=1;d<=dim;d++){
+    const iso=`${y}-${p2(m+1)}-${p2(d)}`,w=dow(iso),we=w===0||w===6,has=!!h[iso];
+    const off=iso>t||(full&&!has&&iso<oldest);
+    const cls=['day',we?'we':'',has?'has':'',hol.has(iso)?'hol':'',miss.has(iso)&&!hol.has(iso)?'miss':'',iso===state.sel?'sel':'',off?'off':'',iso===t?'today':''].filter(Boolean).join(' ');
+    const lab=has?h[iso].length:hol.has(iso)?'hol':miss.has(iso)?'no data':'';
+    html+=`<button type="button" class="${cls}" data-d="${iso}" ${off?'disabled':''} aria-pressed="${iso===state.sel}" aria-label="${esc(dispLong(iso))}${has?`, ${h[iso].length} stocks saved`:hol.has(iso)?', holiday':miss.has(iso)?', no data':''}"><span>${d}</span><span class="c">${lab}</span></button>`;
+  }
+  $('#cal').innerHTML=html;
+  // selected day box
+  const sel=state.sel,hasSel=!!h[sel];
+  $('#selTxt').textContent=dispLong(sel);
+  $('#selSub').textContent=hasSel?`${h[sel].length} stocks saved. Uploading again replaces them.`:hol.has(sel)?'Marked as a market holiday.':'No data saved yet.';
+  $('#delBtn').disabled=!hasSel;$('#holBtn').textContent=hol.has(sel)?'Unmark holiday':'Mark as holiday';$('#holBtn').disabled=hasSel;
+  // slot tape
+  const n=W.dates.length;
+  $('#slots').innerHTML=Array.from({length:CAP},(_,i)=>`<i class="${i<n?'f':''}" ${i<n?tipA(dispLong(W.dates[i])):''}></i>`).join('');
+  $('#slotTxt').innerHTML=n?`<b>${n} / ${CAP}</b> days · ${shortIso(W.dates[0])} to ${shortIso(W.last)}`+(full?` · next new day drops ${shortIso(W.dates[0])}`:''):'<b>0 / 20</b> days loaded';
+}
+function renderTabs(el,items,cur){
+  $(el).innerHTML=items.map(i=>`<button class="tab" role="tab" type="button" data-k="${esc(i.k)}" aria-selected="${cur===i.k}"><span class="dot" style="background:${i.c}"></span><span class="nm">${i.k==='ALL'?'All sectors':esc(i.k)}</span><span class="n">${i.n}</span></button>`).join('');
+}
+function renderDay(){
+  const c=state.cur,all=c.rows,rows=visible(),W=state.W;
+  const t=[...all].sort((a,b)=>b.chg-a.chg).slice(0,14);
+  $('#tape').innerHTML=`<span class="lbl">TOP MOVERS</span>`+t.map(r=>`<span><b>${esc(r.sym)}</b><span class="${r.chg>=0?'up':'dn'}">${sgn(r.chg)}</span></span>`).join('');
+  // kpis
+  const n=rows.length,up=rows.filter(r=>r.chg>0).length,dn=rows.filter(r=>r.chg<0).length,fresh=rows.filter(r=>r.st===0).length,best=[...rows].sort((a,b)=>b.chg-a.chg)[0];
+  const grp=state.tab==='ALL'?['Sectors',new Set(rows.map(r=>r.sec)).size,'across the list']:['Industries',new Set(rows.map(r=>r.ind)).size,state.tab];
+  const k=[['Stocks above old high',n,'acc',state.tab==='ALL'?'all sectors':state.tab],[grp[0],grp[1],'',grp[2]],
+    ['Median past old high',n?sgn(med(rows.filter(r=>r.past!=null).map(r=>r.past))):'–','','close vs previous ATH'],
+    ['Fresh crosses',fresh,'',n?`under 1% past, ${(fresh/n*100).toFixed(0)}% of stocks`:'–'],
+    ['Advancers / decliners',`${up} / ${dn}`,'',`${n-up-dn} flat`],
+    ['Median day change',n?sgn(med(rows.map(r=>r.chg))):'–','',best?`best ${best.sym} ${sgn(best.chg)}`:'–']];
+  $('#kpis').innerHTML=k.map(x=>`<div class="kpi"><div class="l">${esc(x[0])}</div><div class="v ${x[2]}">${x[1]}</div><div class="s">${esc(x[3])}</div></div>`).join('');
+  // tabs
+  const g={};all.forEach(r=>g[r.sec]=(g[r.sec]||0)+1);
+  renderTabs('#tabs',[{k:'ALL',n:all.length,c:'var(--accent)'},...Object.keys(g).sort((a,b)=>g[b]-g[a]||a.localeCompare(b)).map(s=>({k:s,n:g[s],c:col(s)}))],state.tab);
+  // insight card
+  const kk=state.tab,pr=rows.filter(r=>r.past!=null);
+  const mini=[['Stocks',rows.length],['Industries',new Set(rows.map(r=>r.ind)).size],['Median past old high',sgn(med(pr.map(r=>r.past)))],['Average day change',sgn(avg(rows.map(r=>r.chg)))],
+    ['Highest close',rows.length?'₹'+fp(Math.max(...rows.map(r=>r.close))):'–'],['Lowest close',rows.length?'₹'+fp(Math.min(...rows.map(r=>r.close))):'–']];
+  $('#ins').innerHTML=`<div class="ins-l"><div class="code" style="color:${kk==='ALL'?'var(--accent)':col(kk)}">${kk==='ALL'?'All sectors':esc(kk)}</div><div class="nm">${kk==='ALL'?'Every sector combined':'Sector view'} · ${dispIso(c.iso)}</div><div class="mini">${mini.map(m=>`<div><span>${m[0]}</span><span>${m[1]}</span></div>`).join('')}</div></div>`+
+    `<div class="ins-r"><ul>${insights(rows,kk,all).map(i=>`<li><span class="t">${esc(i.t)}</span><span class="x">${i.x}</span></li>`).join('')}</ul></div>`;
+  $('#c1').innerHTML=chartSector(all);$('#c2').innerHTML=chartRank(rows);$('#c3').innerHTML=chartScatter(rows);
+  $('#t4').textContent=state.tab==='ALL'?'Stocks by industry':'Industries in '+state.tab;$('#c4').innerHTML=chartIndustry(rows);
+  renderMon(W);renderTable(rows,W);
+}
+function renderMon(W){
+  const c=state.cur,wide=t=>`<p class="empty" style="grid-column:1/-1">${t}</p>`;
+  if(c.sample||!W.sets[c.iso]){$('#monSub').textContent='Needs saved days';$('#mon').innerHTML=wide('The sample is not saved. Upload at least two trading days to see new entrants, drop-offs and streaks.');return}
+  const di=W.dates.indexOf(c.iso);
+  if(di<1){$('#monSub').textContent='Earliest saved day';$('#mon').innerHTML=wide('This is the earliest saved day, so there is nothing before it to compare with. Open a later day, or upload an earlier one.');return}
+  const prev=W.dates[di-1],ps=W.sets[prev],cs=W.sets[c.iso];
+  const newRows=c.rows.filter(r=>!ps.has(keyOf(r))),exits=W.perDay[prev].filter(r=>!cs.has(keyOf(r)));
+  const gap=W.sidx[c.iso]-W.sidx[prev]>1;
+  $('#monSub').textContent=`Compared with ${dispIso(prev)}${gap?' (days in between have no data)':''}`;
+  const sy=r=>`<span class="sy"><i style="background:${col(r.sec)}"></i>${esc(r.sym)}</span>`;
+  const top=c.rows.map(r=>({r,s:streakOf(W,keyOf(r),c.iso)})).filter(x=>x.s>=2).sort((a,b)=>b.s-a.s).slice(0,12);
+  const colm=(t,n,body)=>`<div><h3>${t} <b>${n}</b></h3>${body}</div>`;
+  $('#mon').innerHTML=
+    colm('New on the list',newRows.length,newRows.length?`<div class="pills">${newRows.map(sy).join('')}</div>`:'<p class="empty">No new entrants.</p>')+
+    colm('Dropped off',exits.length,exits.length?`<div class="pills">${exits.map(sy).join('')}</div>`:'<p class="empty">Nobody dropped off.</p>')+
+    colm('Longest streaks',top.length,top.length?`<div class="pills">${top.map(x=>`<span class="sy"><i style="background:${col(x.r.sec)}"></i>${esc(x.r.sym)} · ${x.s}d</span>`).join('')}</div>`:'<p class="empty">No stock has been listed on two trading days in a row.</p>');
+}
+const COLS=[['name','Stock'],['sym','Symbol'],['sec','Sector'],['ind','Industry'],['ath','Old high'],['close','Close'],['past','Past old high'],['chg','Day change'],['st','Status'],['streak','Days in a row']];
+function renderTable(rows,W){
+  const c=state.cur,q=state.q.trim().toUpperCase(),stf=state.stf,saved=!c.sample&&W.sets[c.iso];
+  let a=rows.filter(r=>(!q||r.sym.includes(q)||r.name.toUpperCase().includes(q))&&(stf===''||r.st===+stf));
+  const sk=state.sort.k,d=state.sort.d,st=r=>saved?streakOf(W,keyOf(r),c.iso):null;
+  const val=r=>sk==='streak'?st(r):r[sk];
+  a=[...a].sort((x,y)=>{const u=val(x),v=val(y);if(u==null&&v==null)return 0;if(u==null)return 1;if(v==null)return -1;return (typeof u==='string'?u.localeCompare(v):u-v)*d});
+  $('#thr').innerHTML=COLS.map(cc=>`<th ${sk===cc[0]?`aria-sort="${d>0?'ascending':'descending'}"`:''}><button type="button" data-s="${cc[0]}">${cc[1]}${sk===cc[0]?(d>0?' ▲':' ▼'):''}</button></th>`).join('');
+  $('#tblSub').textContent=`${a.length} of ${rows.length} stocks`;
+  const di=saved?W.dates.indexOf(c.iso):-1,ps=di>0?W.sets[W.dates[di-1]]:null;
+  $('#tbody').innerHTML=a.length?a.map(r=>`<tr><td>${esc(r.name)}${ps&&!ps.has(keyOf(r))?'<span class="tag">NEW</span>':''}</td><td class="sym">${esc(r.sym)}</td>`+
+    `<td><span class="sd" style="background:${col(r.sec)}"></span>${esc(r.sec)}</td><td>${esc(r.ind)}</td>`+
+    `<td class="m">${r.ath>0?fp(r.ath):'–'}</td><td class="m">${fp(r.close)}</td><td class="m up">${sgn(r.past)}</td><td class="m ${r.chg>0?'up':r.chg<0?'dn':''}">${sgn(r.chg)}</td>`+
+    `<td><span class="pill p${r.st}">${ST_LABEL[r.st]}</span></td><td class="m">${saved?st(r):'–'}</td></tr>`).join('')
+    :`<tr><td colspan="${COLS.length}" style="text-align:center;color:var(--mut);padding:22px">No stocks match this filter.</td></tr>`;
+}
+const CCOLS=[['name','Stock'],['sym','Symbol'],['sec','Sector'],['days','Days listed'],['fi','First listed'],['li','Last listed'],['fc','First close'],['lc','Latest close'],['move','Move since first'],['avgChg','Avg day change'],['re','Re-entries'],['active','Status']];
+function renderCum(){
+  const W=state.W,N=W.dates.length;
+  const empty=$('#cumEmpty'),body=$('#cumBody');
+  if(N<2){
+    empty.hidden=false;body.hidden=true;
+    $('#cumEmptyTxt').textContent=N===0?'No days saved yet. Pick a trading day in the calendar and upload its CSV. Once two or more days are saved, the 20-day analysis appears here.':`Only ${N} day is saved. Upload at least one more trading day and the analysis appears here.`;
+    return;
+  }
+  empty.hidden=true;body.hidden=false;
+  const all=W.stocks,sec=state.ctab==='ALL'?'':state.ctab;
+  const stocks=sec?all.filter(s=>s.sec===sec):all;
+  // kpis
+  const rep=stocks.filter(s=>s.days>1),act=stocks.filter(s=>s.active),mv=stocks.filter(s=>s.move!=null).map(s=>s.move);
+  const per=W.dates.map(d=>W.perDay[d].filter(r=>!sec||r.sec===sec).length);
+  const k=[['Days loaded',`${N} / ${CAP}`,'acc',`${shortIso(W.dates[0])} to ${shortIso(W.last)}`+(W.missing.length?`, ${W.missing.length} weekday${W.missing.length>1?'s':''} without data`:'')],
+    ['Different stocks',stocks.length,'',sec||'all sectors'],['Repeat crossers',rep.length,'',stocks.length?`${(rep.length/stocks.length*100).toFixed(0)}% listed on 2+ days`:'–'],
+    ['Average per day',avg(per).toFixed(1),'',`peak ${Math.max(...per)}, low ${Math.min(...per)}`],
+    ['Still listed',act.length,'',`on ${shortIso(W.last)}`],['Median move since first',mv.length?sgn(med(mv)):'–','',mv.length?`${mv.filter(x=>x>0).length} of ${mv.length} are higher`:'needs 2+ listings']];
+  $('#ckpis').innerHTML=k.map(x=>`<div class="kpi"><div class="l">${esc(x[0])}</div><div class="v ${x[2]}">${x[1]}</div><div class="s">${esc(x[3])}</div></div>`).join('');
+  const g={};all.forEach(s=>g[s.sec]=(g[s.sec]||0)+1);
+  renderTabs('#ctabs',[{k:'ALL',n:all.length,c:'var(--accent)'},...Object.keys(g).sort((a,b)=>g[b]-g[a]||a.localeCompare(b)).map(s=>({k:s,n:g[s],c:col(s)}))],state.ctab);
+  const kk=state.ctab;
+  $('#cins').innerHTML=`<div class="ins-l"><div class="code" style="color:${kk==='ALL'?'var(--accent)':col(kk)}">${kk==='ALL'?'All sectors':esc(kk)}</div><div class="nm">${N}-day window</div></div><div class="ins-r"><ul>${cumInsights(W,stocks,sec).map(i=>`<li><span class="t">${esc(i.t)}</span><span class="x">${i.x}</span></li>`).join('')}</ul></div>`;
+  $('#d1').innerHTML=chartDaily(W,sec);$('#d2').innerHTML=chartSectorWin(all);$('#d3').innerHTML=chartRepeat(stocks);$('#d4').innerHTML=chartMove(stocks);
+  $('#heatSub').textContent=stocks.length>40?`Top 40 of ${stocks.length} stocks, most days listed first`:`${stocks.length} stocks, most days listed first. Dashed columns have no data.`;
+  $('#heat').innerHTML=chartHeat(W,stocks);
+  renderCumTable(stocks);
+}
+function renderCumTable(stocks){
+  const q=state.cq.trim().toUpperCase(),f=state.cstf;
+  let a=stocks.filter(s=>(!q||s.sym.includes(q)||s.name.toUpperCase().includes(q))&&(f===''||(f==='a'&&s.active)||(f==='d'&&!s.active)||(f==='r'&&s.days>1)));
+  const sk=state.csort.k,d=state.csort.d;
+  a=[...a].sort((x,y)=>{let u=x[sk],v=y[sk];if(typeof u==='boolean'){u=+u;v=+v}if(u==null&&v==null)return 0;if(u==null)return 1;if(v==null)return -1;return (typeof u==='string'?u.localeCompare(v):u-v)*d});
+  $('#cthr').innerHTML=CCOLS.map(c=>`<th ${sk===c[0]?`aria-sort="${d>0?'ascending':'descending'}"`:''}><button type="button" data-s="${c[0]}">${c[1]}${sk===c[0]?(d>0?' ▲':' ▼'):''}</button></th>`).join('');
+  $('#ctblSub').textContent=`${a.length} of ${stocks.length} stocks`;
+  $('#ctbody').innerHTML=a.length?a.map(s=>`<tr><td>${esc(s.name)}</td><td class="sym">${esc(s.sym)}</td><td><span class="sd" style="background:${col(s.sec)}"></span>${esc(s.sec)}</td>`+
+    `<td class="m">${s.days}</td><td class="m">${shortIso(s.fi)}</td><td class="m">${shortIso(s.li)}</td><td class="m">${fp(s.fc)}</td><td class="m">${fp(s.lc)}</td>`+
+    `<td class="m ${s.move>0?'up':s.move<0?'dn':''}">${sgn(s.move)}</td><td class="m ${s.avgChg>0?'up':s.avgChg<0?'dn':''}">${sgn(s.avgChg)}</td><td class="m">${s.re||'–'}</td>`+
+    `<td><span class="pill ${s.active?'pa':'pd'}">${s.active?'LISTED':'DROPPED'}</span></td></tr>`).join('')
+    :`<tr><td colspan="${CCOLS.length}" style="text-align:center;color:var(--mut);padding:22px">No stocks match this filter.</td></tr>`;
+}
+function renderAll(){
+  state.W=buildWindow();assignColors();renderChrome();
+  if(state.view==='day')renderDay();else renderCum();
+  $('#foot').textContent='Past old high is the close against the previous all-time high, from the Chg % Since column when present. Day change is the Chg % column. The window keeps the latest 20 saved trading days; weekends and marked holidays are not counted as missing. Move since first listed compares the first and latest day a stock was on the list, so it ignores days it was off the list. Sector colours are fixed once assigned, the first six sectors get their own colour and the rest share grey. Prices in rupees.';
+}
+
+/* ---------- events ---------- */
+$('#vDay').addEventListener('click',()=>{state.view='day';renderAll()});
+$('#vCum').addEventListener('click',()=>{state.view='cum';renderAll()});
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;state.tab=b.dataset.k;renderAll()});
+$('#ctabs').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;state.ctab=b.dataset.k;renderAll()});
+$('#thr').addEventListener('click',e=>{const b=e.target.closest('[data-s]');if(!b)return;const k=b.dataset.s;state.sort=state.sort.k===k?{k,d:-state.sort.d}:{k,d:['name','sym','sec','ind'].includes(k)?1:-1};renderDay()});
+$('#cthr').addEventListener('click',e=>{const b=e.target.closest('[data-s]');if(!b)return;const k=b.dataset.s;state.csort=state.csort.k===k?{k,d:-state.csort.d}:{k,d:['name','sym','sec'].includes(k)?1:-1};renderCum()});
+$('#q').addEventListener('input',e=>{state.q=e.target.value;renderTable(visible(),state.W)});
+$('#stf').addEventListener('change',e=>{state.stf=e.target.value;renderTable(visible(),state.W)});
+$('#cq').addEventListener('input',e=>{state.cq=e.target.value;renderCum()});
+$('#cstf').addEventListener('change',e=>{state.cstf=e.target.value;renderCum()});
+$('#calPrev').addEventListener('click',()=>{const c=state.cal;state.cal=c.m===0?{y:c.y-1,m:11}:{y:c.y,m:c.m-1};renderChrome()});
+$('#calNext').addEventListener('click',()=>{const c=state.cal;state.cal=c.m===11?{y:c.y+1,m:0}:{y:c.y,m:c.m+1};renderChrome()});
+$('#cal').addEventListener('click',e=>{const b=e.target.closest('[data-d]');if(b&&!b.disabled)selectDay(b.dataset.d)});
+$('#cal').addEventListener('dragover',e=>{const b=e.target.closest('[data-d]');if(b&&!b.disabled){e.preventDefault();b.classList.add('over')}});
+$('#cal').addEventListener('dragleave',e=>{const b=e.target.closest('[data-d]');if(b)b.classList.remove('over')});
+$('#cal').addEventListener('drop',e=>{const b=e.target.closest('[data-d]');if(!b||b.disabled)return;e.preventDefault();b.classList.remove('over');
+  const fs=[...e.dataTransfer.files];if(fs.length===1){state.sel=b.dataset.d;handleFiles(fs,b.dataset.d)}else handleFiles(fs)});
+$('#upBtn').addEventListener('click',()=>$('#file').click());
+$('#manyBtn').addEventListener('click',()=>$('#fileMany').click());
+$('#file').addEventListener('change',e=>{handleFiles(e.target.files,state.sel);e.target.value=''});
+$('#fileMany').addEventListener('change',e=>{handleFiles(e.target.files);e.target.value=''});
+$('#delBtn').addEventListener('click',()=>deleteDay(state.sel));
+$('#holBtn').addEventListener('click',()=>toggleHoliday(state.sel));
+$('#sample').addEventListener('click',()=>loadSample());
+const drop=$('#drop');
+['dragenter','dragover'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>handleFiles(e.dataTransfer.files,state.sel));
+$('#bkCopy').addEventListener('click',async()=>{
+  const t=backupText(),ta=$('#bkText');ta.value=t;
+  try{await navigator.clipboard.writeText(t);setMsg('Backup copied. Paste it somewhere safe, such as a note or a file.')}
+  catch(e){ta.focus();ta.select();setMsg('Your browser blocked automatic copy. The backup text is selected in the box below, so copy it by hand.')}
+});
+$('#bkRestore').addEventListener('click',()=>{try{restore($('#bkText').value.trim())}catch(e){setErr(e.message)}});
+$('#themeBtn').addEventListener('click',()=>{
+  const el=document.documentElement,cur=el.dataset.theme||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');
+  const nx=cur==='dark'?'light':'dark';el.dataset.theme=nx;try{localStorage.setItem('ath.theme',nx)}catch(e){}
+});
+try{const t=localStorage.getItem('ath.theme');if(t)document.documentElement.dataset.theme=t}catch(e){}
+const tip=$('#tip');
+document.addEventListener('pointerover',e=>{const t=e.target.closest&&e.target.closest('[data-tip]');if(t){tip.innerHTML=t.dataset.tip;tip.hidden=false}else tip.hidden=true});
+document.addEventListener('pointermove',e=>{if(tip.hidden)return;tip.style.left=Math.max(8,Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8))+'px';tip.style.top=Math.max(8,Math.min(e.clientY+14,innerHeight-tip.offsetHeight-8))+'px'});
+document.addEventListener('pointerleave',()=>{tip.hidden=true});
+
+(function boot(){
+  const ks=Object.keys(loadHist()).sort();
+  initSel();
+  if(ks.length){setFromHist(ks[ks.length-1]);setMsg(`Loaded your saved history: <b>${ks.length}</b> ${ks.length===1?'day':'days'}. Latest is ${dispLong(ks[ks.length-1])}. The calendar is set to the next day to fill.`);renderAll()}
+  else loadSample();
+})();
+</script>
